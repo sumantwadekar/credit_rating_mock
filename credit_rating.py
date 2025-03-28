@@ -1,52 +1,53 @@
 import json
 import pandas as pd
 import numpy as np
+import constants
+
+
+def validate_exact_columns(df):
+    """Validates the dataframe has exactly the specified columns"""
+    actual_columns = set(df.columns)
+    required_columns = set(constants.REQUIRED_COLUMNS)
+
+    extra_columns = actual_columns - required_columns
+    missing_columns = required_columns - actual_columns
+    if extra_columns:
+        raise ValueError(f"Extra columns in the input: {extra_columns}")
+    if missing_columns:
+        raise ValueError(f"Missing columns in the input: {missing_columns}")
 
 
 def validate_inputs(df):
     """Validates the dataframe input"""
-    validation_rules = {
-        "credit_score": {"dtype": int, "range": (300, 850)},
-        "loan_amount": {
-            "dtype": (float, int),
-            # loan amount should min 1 to consider it as mortgage
-            "min": 1,
-        },
-        "property_value": {
-            "dtype": (float, int),
-            # must be greater than 0 to calculate LTV
-            "min": 1,
-        },
-        "annual_income": {
-            "dtype": (float, int),
-            # must be greater than 0 to calculate DTI
-            "min": 1,
-        },
-        "debt_amount": {
-            "dtype": (float, int),
-            "min": 0,
-        },
-        "loan_type": {
-            "dtype": object,
-            "options": ["adjustable", "fixed"],
-        },
-        "property_type": {
-            "dtype": object,
-            "options": ["single_family", "condo"],
-        },
-    }
+
+    # validate any missing keys in any rows
+    has_nans = df.isna().any().any()
+    if has_nans:
+        raise ValueError("Some keys are missing in json obj")
+
+    # Validate exact columns
+    validate_exact_columns(df)
 
     # check if any column is missing
     missing_columns = [
-        column for column in validation_rules if column not in df.columns
+        column for column in constants.VALIDATION_RULES if column not in df.columns
     ]
     if missing_columns:
         raise KeyError(f"Missing required columns: {missing_columns}")
 
     # validate each column as defined in rules above
-    for column, rule in validation_rules.items():
+    for column, rule in constants.VALIDATION_RULES.items():
         # validate all rows follow the datatype
-        valid = df[column].apply(lambda x: isinstance(x, rule["dtype"])).all()
+        valid = (
+            df[column]
+            .apply(
+                lambda x: isinstance(
+                    x,
+                    rule["dtype"],
+                )
+            )
+            .all()
+        )
         if not valid:
             raise ValueError(f"Column {column} contains invalid data types")
 
@@ -55,7 +56,7 @@ def validate_inputs(df):
             below_min = df[column] < rule["min"]
             if below_min.any():
                 raise ValueError(
-                    f"Column {column} contains values lower than min allowed"
+                    f"Column {column} contains values lower than allowed minimum"
                 )
 
         # check range for columns is applicable
@@ -63,7 +64,7 @@ def validate_inputs(df):
             allowed_min = rule["range"][0]
             allowed_max = rule["range"][1]
             if df[column].min() < allowed_min or df[column].max() > allowed_max:
-                raise ValueError(f"Column {column} contains out of range values")
+                raise ValueError(f"Column {column} values higher than allowed maximum")
 
         # check options for columns if applicable
         if "options" in rule:
@@ -78,18 +79,11 @@ def validate_inputs(df):
         raise ValueError(
             "Some mortgages have invalid combination of loan amount and property values"
         )
+    return 0
 
 
-def calculate_rmbs_ratings(input_file):
+def calculate_rmbs_ratings(df):
     """Calculate RMBS ratings for given input file"""
-
-    # Read input file
-    with open(input_file) as file:
-        data = json.load(file)
-
-    # Convert json obj to dataframe
-    df = pd.DataFrame(data["mortgages"])
-
 
     # Validate input data
     validate_inputs(df)
@@ -122,10 +116,10 @@ def calculate_rmbs_ratings(input_file):
     )
 
     # loan type impact
-    df["credit_score"] += np.where(df["loan_type"] == "fixed", -1, 1)
+    df["risk_score"] += np.where(df["loan_type"] == "fixed", -1, 1)
 
     # property type impact
-    df["credit_score"] += np.where(
+    df["risk_score"] += np.where(
         df["property_type"] == "single_family",
         0,
         1,
@@ -150,5 +144,11 @@ def calculate_rmbs_ratings(input_file):
 
 if __name__ == "__main__":
     input_file_name = "input.json"
-    rating = calculate_rmbs_ratings(input_file=input_file_name)
+    # Read input file
+    with open(input_file_name) as file:
+        data = json.load(file)
+
+    # Convert json obj to dataframe
+    df = pd.DataFrame(data["mortgages"])
+    rating = calculate_rmbs_ratings(df)
     print(f"Final rating is {rating}")
