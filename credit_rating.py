@@ -82,7 +82,7 @@ def validate_inputs(df):
     return 0
 
 
-def calculate_rmbs_ratings(df):
+def calculate_credit_rating(df):
     """Calculate RMBS ratings for given input file"""
 
     # Validate input data
@@ -150,5 +150,5 @@ if __name__ == "__main__":
 
     # Convert json obj to dataframe
     df = pd.DataFrame(data["mortgages"])
-    rating = calculate_rmbs_ratings(df)
+    rating = calculate_credit_rating(df)
     print(f"Final rating is {rating}")
