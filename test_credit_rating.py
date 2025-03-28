@@ -1,7 +1,7 @@
 import unittest
 import json
 import pandas as pd
-from credit_rating import validate_inputs, calculate_rmbs_ratings
+from credit_rating import validate_inputs, calculate_credit_rating
 
 
 class TestCreditRating(unittest.TestCase):
@@ -151,5 +151,66 @@ class TestCreditRating(unittest.TestCase):
         # Expected manual calculation:
         # -1 (credit) + 1 (LTV) + 2 (DTI) + 1 (loan type) + 1 (property) + (-1) (average credit score) = 3
 
-        result = calculate_rmbs_ratings(df)
+        result = calculate_credit_rating(df)
         self.assertEqual(result, "BBB")  # Since 3 is in 3-5 BBB range
+
+    def test_credit_score_lt_650(self):
+        """Tests a scenario where credit score is less than 650"""
+        df = pd.DataFrame(
+            {
+                "credit_score": [600],  # Should give +1 (<650)
+                "loan_amount": [170000],
+                "property_value": [200000],  # LTV = 85% -> +1 points
+                "annual_income": [100000],
+                "debt_amount": [60000],  # DTI = 60% -> +2 points
+                "loan_type": ["adjustable"],  # +1 point
+                "property_type": ["condo"],  # +1 point
+            }
+        )
+
+        # Expected manual calculation:
+        # 1 (credit) + 1 (LTV) + 2 (DTI) + 1 (loan type) + 1 (property) + 1 (average credit score) = 7
+
+        result = calculate_credit_rating(df)
+        self.assertEqual(result, "C")  # Since 7 is in >5 C range
+
+    def test_credit_score_in_650_to_700(self):
+        """Tests a scenario where credit score is in range of 650 to 700"""
+        df = pd.DataFrame(
+            {
+                "credit_score": [666],  # Should give 0 (650 < 666 < 700)
+                "loan_amount": [140000],
+                "property_value": [200000],  # LTV = 70% -> 0 points
+                "annual_income": [100000],
+                "debt_amount": [45000],  # DTI = 45% -> +1 points
+                "loan_type": ["fixed"],  # 0 point
+                "property_type": ["single_family"],  # 0 point
+            }
+        )
+
+        # Expected manual calculation:
+        # 0 (credit) + 0 (LTV) + 1 (DTI) + 0 (loan type) + 0 (property) + 0 (average credit score) = 1
+
+        result = calculate_credit_rating(df)
+        self.assertEqual(result, "AAA")  # Since 1 is <=2 AAA range
+
+
+    def test_credit_score_in_gt_700(self):
+        """Tests a scenario where credit score is in range of 650 to 700"""
+        df = pd.DataFrame(
+            {
+                "credit_score": [777],  # Should give -1 (700 < 777)
+                "loan_amount": [190000],
+                "property_value": [200000],  # LTV = 95% -> 2 points
+                "annual_income": [100000],
+                "debt_amount": [30000],  # DTI = 30% -> 0 points
+                "loan_type": ["fixed"],  # 0 point
+                "property_type": ["single_family"],  # 0 point
+            }
+        )
+
+        # Expected manual calculation:
+        # -1 (credit) + 2 (LTV) + 0 (DTI) + 0 (loan type) + 0 (property) + (-1) (average credit score) = 0
+
+        result = calculate_credit_rating(df)
+        self.assertEqual(result, "AAA")  # Since 0 is <=2 AAA range
