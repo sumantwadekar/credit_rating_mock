@@ -194,7 +194,6 @@ class TestCreditRating(unittest.TestCase):
         result = calculate_credit_rating(df)
         self.assertEqual(result, "AAA")  # Since 1 is <=2 AAA range
 
-
     def test_credit_score_in_gt_700(self):
         """Tests a scenario where credit score is in range of 650 to 700"""
         df = pd.DataFrame(
